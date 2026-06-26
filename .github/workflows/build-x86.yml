@@ -27,11 +27,11 @@ jobs:
       - name: Build (Release, Win32 = x86, v141)
         id: build_v141
         continue-on-error: true
-        run: msbuild Timelapse.sln /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v141 /m /v:minimal
+        run: msbuild Timelapse.sln /p:Configuration=Release /p:Platform=x86 /p:PlatformToolset=v141 /m /v:minimal
 
       - name: Build fallback (Release, Win32, v143) if v141 failed
         if: steps.build_v141.outcome == 'failure'
-        run: msbuild Timelapse.sln /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v143 /m /v:minimal
+        run: msbuild Timelapse.sln /p:Configuration=Release /p:Platform=x86 /p:PlatformToolset=v143 /m /v:minimal
 
       - name: Collect built DLL / pdb
         if: always()
