@@ -1,0 +1,57 @@
+name: Build Timelapse x86 (Win32 Release)
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: List available MSVC toolsets (diagnostic)
+        shell: pwsh
+        run: |
+          Write-Host "=== Installed MSVC toolsets ==="
+          Get-ChildItem 'C:\Program Files (x86)\Microsoft Visual Studio\*\*\VC\Tools\MSVC' -ErrorAction SilentlyContinue | Select-Object Name
+          Write-Host "=== v141 toolset present? ==="
+          Test-Path 'C:\Program Files (x86)\Microsoft Visual Studio\2017\*\VC\Tools\MSVC'
+
+      - name: Build (Release, Win32 = x86, v141)
+        id: build_v141
+        continue-on-error: true
+        run: msbuild Timelapse.sln /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v141 /m /v:minimal
+
+      - name: Build fallback (Release, Win32, v143) if v141 failed
+        if: steps.build_v141.outcome == 'failure'
+        run: msbuild Timelapse.sln /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v143 /m /v:minimal
+
+      - name: Collect built DLL / pdb
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Host "=== Looking for outputs ==="
+          Get-ChildItem -Recurse -Include *.dll,*.pdb,*.exp,*.lib -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match 'Release' }
+          $out = "artifacts"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          Get-ChildItem -Recurse -Include Timelapse.dll,Timelapse.pdb -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match 'Release' } |
+            ForEach-Object { Copy-Item $_.FullName -Destination $out -Force }
+          Write-Host "=== Collected ==="
+          Get-ChildItem $out
+
+      - name: Upload x86 build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Timelapse-x86-Release
+          path: artifacts
+          if-no-files-found: warn
